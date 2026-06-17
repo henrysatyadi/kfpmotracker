@@ -29,10 +29,20 @@ source of truth once you're signed in.
    Copy the `firebaseConfig` object it gives you into `firebase-config.js`, replacing the
    placeholder values.
 6. **Host it.** This is a static site (HTML/CSS/JS, no server/build step needed), so any
-   static host works:
-   - `firebase deploy` with Firebase Hosting (simplest, same project as your DB), or
-   - Netlify / Vercel / GitHub Pages / your own web server — just upload `index.html`,
-     `firebase-config.js`, and `firebase-init.js` together.
+   static host works.
+
+   **Easiest path — Firebase Hosting (uses the included `firebase.json`/`.firebaserc`):**
+   ```bash
+   npm install -g firebase-tools   # one-time
+   firebase login
+   # edit .firebaserc and set "default" to your actual Firebase project ID
+   firebase deploy
+   ```
+   Firebase prints a live URL (`https://<project-id>.web.app`) — that's your portal.
+
+   **Alternative static hosts** (Netlify, Vercel, GitHub Pages, your own server): just
+   upload `index.html`, `firebase-config.js`, and `firebase-init.js` together — no build
+   step required.
 
 ## Using it
 
