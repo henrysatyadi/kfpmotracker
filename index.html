@@ -11,7 +11,18 @@
 <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/@tabler/icons-webfont@3.19.0/dist/tabler-icons.min.css">
 <script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.1/chart.umd.js"></script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
+<script type="module" src="firebase-init.js"></script>
 <style>
+.login-screen{display:none;position:fixed;inset:0;z-index:9999;background:var(--bg2);align-items:center;justify-content:center;padding:24px}
+.login-box{width:100%;max-width:360px;background:var(--bg);border:1px solid var(--border);border-radius:var(--rl);padding:28px;box-shadow:0 8px 30px rgba(0,0,0,.08)}
+.login-box h1{font-size:18px;margin:0 0 4px;display:flex;align-items:center;gap:8px}
+.login-box .sub{font-size:12px;color:var(--text2);margin-bottom:18px}
+.login-box input,.login-box select{width:100%;box-sizing:border-box;margin-bottom:10px;padding:10px 12px;border:1px solid var(--border2);border-radius:var(--r);background:var(--bg);color:var(--text);font-size:14px}
+.login-box button{width:100%}
+#login-error{display:none;background:var(--red-bg);color:var(--red-txt);font-size:12px;padding:8px 10px;border-radius:var(--r);margin-bottom:10px}
+.login-box details{margin-top:14px;border-top:1px solid var(--border);padding-top:14px}
+.login-box summary{cursor:pointer;font-size:13px;font-weight:600;color:var(--teal-txt);margin-bottom:10px}
+</style>
 :root{
   --bg:#fff;--bg2:#f5f5f4;--bg3:#eceae4;
   --text:#1a1917;--text2:#6b6a65;--text3:#9b9a96;
@@ -281,6 +292,31 @@ button,.btn,.act,.mnb,.nb,.mob-xbtn{touch-action:manipulation}
 <body>
 <div class="toast" id="toast"></div>
 
+<div class="login-screen" id="login-screen" style="display:flex">
+  <div class="login-box">
+    <h1><span style="width:9px;height:9px;border-radius:50%;background:var(--teal);display:inline-block"></span> PMO Tracker</h1>
+    <div class="sub">Sign in to access your team's shared tracker</div>
+    <div id="login-error"></div>
+    <input id="login-email" type="email" placeholder="Email" autocomplete="username">
+    <input id="login-password" type="password" placeholder="Password" autocomplete="current-password">
+    <button class="btn btn-teal" onclick="window.pmoAuth.signIn()"><i class="ti ti-login"></i> Sign in</button>
+    <details>
+      <summary>Create an account</summary>
+      <input id="reg-name" placeholder="Full name">
+      <input id="reg-email" type="email" placeholder="Email">
+      <input id="reg-password" type="password" placeholder="Password (min 6 characters)">
+      <select id="reg-role">
+        <option value="pm">Project Manager</option>
+        <option value="director">Director</option>
+        <option value="admin">Admin</option>
+      </select>
+      <button class="btn btn-teal" onclick="window.pmoAuth.register()"><i class="ti ti-user-plus"></i> Create account</button>
+    </details>
+  </div>
+</div>
+
+<div id="app-root" style="display:none">
+
 <!-- MODALS -->
 <div class="modal-bg" id="modal-contact-view"><div class="modal">
   <div class="modal-title"><span id="mcv-title">Contact</span><button class="modal-close" onclick="closeModal('modal-contact-view')"><i class="ti ti-x"></i></button></div>
@@ -327,7 +363,9 @@ button,.btn,.act,.mnb,.nb,.mob-xbtn{touch-action:manipulation}
       <button class="nb" data-tab="sync" onclick="go('sync',this)"><i class="ti ti-refresh"></i>Sync</button>
     </nav>
     <div class="sb-footer">
+      <div id="sb-user-badge" style="margin-bottom:8px"></div>
       <button class="btn btn-teal" style="width:100%;justify-content:center" onclick="exportData()"><i class="ti ti-download"></i>Export & share</button>
+      <button class="btn" style="width:100%;justify-content:center;margin-top:6px" onclick="window.pmoAuth.signOut()"><i class="ti ti-logout"></i>Sign out</button>
       <div class="sb-info" id="sync-label">No data saved yet</div>
     </div>
   </aside>
@@ -350,6 +388,8 @@ button,.btn,.act,.mnb,.nb,.mob-xbtn{touch-action:manipulation}
   <button class="mnb" data-tab="contacts" onclick="go('contacts',this)"><i class="ti ti-users"></i>Contacts</button>
   <button class="mnb" data-tab="settings" onclick="go('settings',this)"><i class="ti ti-settings"></i>More</button>
 </nav>
+
+</div>
 
 <script>
 
@@ -406,7 +446,7 @@ function getMergedStages(c){
 }
 
 // ── SEED DATA ─────────────────────────────────────────────────────────────────
-const SEED={
+var SEED={
   "oN": 13,
   "pN": 13,
   "contId": 34,
@@ -1852,7 +1892,7 @@ const SEED={
 };
 
 // ── STATE ─────────────────────────────────────────────────────────────────────
-let D=JSON.parse(JSON.stringify(SEED));
+var D=JSON.parse(JSON.stringify(SEED));
 let charts={};
 let cFilter='all';
 let cSort={col:'name',dir:'asc'};
@@ -1867,7 +1907,7 @@ function pmNRforFY(fy){let t=0;D.cases.forEach(c=>(c.paymentMilestones||[]).forE
 function pmRCforFY(fy){let t=0;D.cases.forEach(c=>(c.paymentMilestones||[]).forEach(m=>{if(inFY(m.date,fy))t+=m.rc||0;}));return t;}
 
 // ── PERSISTENCE ───────────────────────────────────────────────────────────────
-function save(){D._saved=new Date().toISOString();normalizeData();safeSetStorage(STORAGE_KEY,JSON.stringify(D));updateSavedLbl();}
+function save(){D._saved=new Date().toISOString();normalizeData();safeSetStorage(STORAGE_KEY,JSON.stringify(D));updateSavedLbl();if(window.pmoCloudSave)window.pmoCloudSave();}
 function updateSavedLbl(){
   if(!D._saved)return;
   const t=new Date(D._saved);
@@ -1881,7 +1921,6 @@ function load(){
   else save();
   normalizeData();
   if(!D.revisit)D.revisit=[];
-  if(!D.editor){const n=prompt('Welcome!\nEnter your name:');if(n&&n.trim()){D.editor=n.trim();save();}}
 }
 function exportData(){
   save();
@@ -3411,6 +3450,10 @@ function drawSettings(){
       <div class="fg" style="margin-bottom:12px"><div class="fl">Your name</div><input type="text" id="set-name" value="${D.editor||''}"></div>
       <button class="btn btn-teal btn-full" onclick="saveSettings()"><i class="ti ti-device-floppy"></i> Save</button>
     </div>
+    <div class="card admin-only" id="users-card" style="display:none">
+      <div class="card-title">Team & roles</div>
+      <div id="users-list" style="font-size:13px;color:var(--text2)">Loading…</div>
+    </div>
     <div class="card">
       <div class="card-title">Project manager list</div>
       <div style="font-size:13px;color:var(--text2);margin-bottom:10px;line-height:1.6">
@@ -3431,8 +3474,31 @@ function drawSettings(){
     </div>
     <div class="card">
       <div class="card-title">Data</div>
+      <p style="font-size:13px;color:var(--text2);margin-bottom:12px">Data is stored centrally and synced live to every signed-in teammate. "Reset" wipes the shared dataset for everyone.</p>
       <button class="btn btn-red btn-full" onclick="resetData()"><i class="ti ti-trash"></i> Reset to sample data</button>
     </div>`;
+  if(window.pmoCurrentUser&&window.pmoCurrentUser.role==='admin'){
+    document.getElementById('users-card').style.display='';
+    drawUsersPanel();
+  }
+}
+async function drawUsersPanel(){
+  const el=document.getElementById('users-list');
+  if(!window.pmoAdmin){el.textContent='Loading…';return;}
+  try{
+    const users=await window.pmoAdmin.listUsers();
+    el.innerHTML=users.map(u=>`
+      <div style="display:flex;align-items:center;gap:10px;padding:8px 0;border-bottom:0.5px solid var(--border)">
+        <div style="flex:1">
+          <div style="font-weight:600;color:var(--text)">${esc(u.name||u.email)}</div>
+          <div style="font-size:11px">${esc(u.email||'')}</div>
+        </div>
+        <select onchange="window.pmoAdmin.setRole('${u.uid}',this.value).then(()=>{toast('Role updated');drawUsersPanel();})" ${u.uid===window.pmoCurrentUser.uid?'disabled title="You cannot change your own role"':''}>
+          ${['pm','director','admin'].map(r=>`<option value="${r}" ${u.role===r?'selected':''}>${r}</option>`).join('')}
+        </select>
+        <button class="btn" style="padding:6px 10px" onclick="window.pmoAdmin.setActive('${u.uid}',${u.active===false}).then(()=>{toast('Updated');drawUsersPanel();})">${u.active===false?'Reactivate':'Deactivate'}</button>
+      </div>`).join('')||'No users yet.';
+  }catch(e){el.textContent='Could not load users (check Firestore rules / connection).';}
 }
 function renderPMPreview(){
   const list=getPMList();
